@@ -1,5 +1,5 @@
 deployments/local
-deployments/hardhat
+deployments/*
 contracts/Router.sol
 
 cannon
