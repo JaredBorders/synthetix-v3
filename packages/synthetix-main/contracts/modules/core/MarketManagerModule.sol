@@ -24,13 +24,13 @@ contract MarketManagerModule is IMarketManagerModule {
     error NotEnoughLiquidity(uint128 marketId, uint amount);
     error MarketDepositNotApproved(address market, address from, uint requestedAmount, uint approvedAmount);
 
-    function registerMarket(address market) external override returns (uint128 marketId) {
+    function registerMarket(address market, address alternativeStablecoin) external override returns (uint128 marketId) {
         FeatureFlag.ensureEnabled(_MARKET_FEATURE_FLAG);
         // Can we verify that `market` conforms to the IMarket interface here? (i.e. has a `balance()` function?)
 
         marketId = Market.create(market).id;
 
-        emit MarketRegistered(market, marketId);
+        emit MarketRegistered(market, marketId, alternativeStablecoin);
 
         return marketId;
     }
@@ -72,17 +72,22 @@ contract MarketManagerModule is IMarketManagerModule {
 
         if (msg.sender != market.marketAddress) revert AccessError.Unauthorized(msg.sender);
 
-        // verify if the market is authorized to burn the USD for the target
-        ITokenModule usdToken = AssociatedSystem.load(_USD_TOKEN).asToken();
+        if (market.alternativeStablecoin == address(0)) {
+            // verify if the market is authorized to burn the USD for the target
+            ITokenModule usdToken = AssociatedSystem.load(_USD_TOKEN).asToken();
 
-        // Adjust accounting
-        market.capacity += uint128(amount);
-        market.issuance -= int128(int(amount));
+            // Adjust accounting
+            market.capacity += uint128(amount);
+            market.issuance -= int128(int(amount));
 
-        // burn USD
-        IUSDTokenModule(address(usdToken)).burnWithAllowance(target, msg.sender, amount);
+            // burn USD
+            IUSDTokenModule(address(usdToken)).burnWithAllowance(target, msg.sender, amount);
 
-        emit UsdDeposited(marketId, target, amount, msg.sender);
+            emit UsdDeposited(marketId, target, amount, msg.sender);
+        } else {
+            IERC20(market.alternativeStablecoin).transferFrom(target, address(this), amount);
+            market.capacity += uint128(amount);
+        }
     }
 
     function withdrawUsd(
@@ -94,15 +99,21 @@ contract MarketManagerModule is IMarketManagerModule {
 
         if (msg.sender != marketData.marketAddress) revert AccessError.Unauthorized(msg.sender);
 
-        if (amount > getWithdrawableUsd(marketId)) revert NotEnoughLiquidity(marketId, amount);
+        if (marketData.alternativeStablecoin == address(0)) {
+            if (amount > getWithdrawableUsd(marketId)) revert NotEnoughLiquidity(marketId, amount);
 
-        // Adjust accounting
-        marketData.capacity -= uint128(amount);
-        marketData.issuance += int128(int(amount));
+            // Adjust accounting
+            marketData.capacity -= uint128(amount);
+            marketData.issuance += int128(int(amount));
 
-        // mint some USD
-        AssociatedSystem.load(_USD_TOKEN).asToken().mint(target, amount);
+            // mint some USD
+            AssociatedSystem.load(_USD_TOKEN).asToken().mint(target, amount);
 
-        emit UsdWithdrawn(marketId, target, amount, msg.sender);
+            emit UsdWithdrawn(marketId, target, amount, msg.sender);
+        } else {
+            if (amount > marketData.capacity) revert NotEnoughLiquidity(marketId, amount);
+            IERC20(marketData.alternativeStablecoin).transfer(target, amount);
+            marketData.capacity -= uint128(amount);
+        }
     }
 }

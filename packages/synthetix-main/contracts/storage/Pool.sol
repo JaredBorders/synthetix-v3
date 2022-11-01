@@ -37,6 +37,7 @@ library Pool {
         Distribution.Data debtDist;
         SetUtil.AddressSet collateralTypes;
         mapping(address => Vault.Data) vaults;
+        address alternativeStablecoin;
     }
 
     function load(uint128 id) internal pure returns (Data storage data) {
@@ -46,11 +47,16 @@ library Pool {
         }
     }
 
-    function create(uint128 id, address owner) internal returns (Pool.Data storage self) {
+    function create(
+        uint128 id,
+        address owner,
+        address alternativeStablecoin
+    ) internal returns (Pool.Data storage self) {
         self = load(id);
 
         self.id = id;
         self.owner = owner;
+        self.alternativeStablecoin = alternativeStablecoin;
     }
 
     function distributeDebt(Data storage self) internal {

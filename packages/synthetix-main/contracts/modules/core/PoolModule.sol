@@ -19,7 +19,11 @@ contract PoolModule is IPoolModule {
 
     bytes32 private constant _POOL_FEATURE_FLAG = "createPool";
 
-    function createPool(uint128 requestedPoolId, address owner) external override {
+    function createPool(
+        uint128 requestedPoolId,
+        address owner,
+        address alternativeStablecoin
+    ) external override {
         FeatureFlag.ensureEnabled(_POOL_FEATURE_FLAG);
 
         if (owner == address(0)) {
@@ -30,9 +34,9 @@ contract PoolModule is IPoolModule {
             revert PoolAlreadyExists(requestedPoolId);
         }
 
-        Pool.create(requestedPoolId, owner);
+        Pool.create(requestedPoolId, owner, alternativeStablecoin);
 
-        emit PoolCreated(requestedPoolId, owner);
+        emit PoolCreated(requestedPoolId, owner, alternativeStablecoin);
     }
 
     // ---------------------------------------
@@ -104,6 +108,17 @@ contract PoolModule is IPoolModule {
         // TODO: this is not super efficient. we only call this to gather the debt accumulated from deployed pools
         // would be better if we could eliminate the call at the end somehow
         Pool.Data storage pool = Pool.load(poolId);
+
+        if (pool.alternativeStablecoin != address(0)) {
+            for (uint k = 0; k < markets.length; k++) {
+                Market.Data storage market = Market.load(markets[k]);
+                require(
+                    market.alternativeStablecoin == pool.alternativeStablecoin,
+                    "You can only back markets with a matching alternative stablecoin"
+                );
+            }
+        }
+
         pool.distributeDebt();
 
         uint totalWeight = 0;

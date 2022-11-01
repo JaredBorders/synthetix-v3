@@ -38,6 +38,8 @@ library Market {
         DepositedCollateral[] depositedCollateral;
         // @notice the maximum amount of a collateral type that this market can deposit
         mapping(address => uint) maximumDepositable;
+        // @notice alternative stablecoin address
+        address alternativeStablecoin;
     }
 
     struct DepositedCollateral {
@@ -73,7 +75,7 @@ library Market {
         }
     }
 
-    function create(address market) internal returns (Market.Data storage self) {
+    function create(address market, address alternativeStablecoin) internal returns (Market.Data storage self) {
         uint128 id = loadLastId();
 
         id++;
@@ -82,6 +84,7 @@ library Market {
 
         self.id = id;
         self.marketAddress = market;
+        self.alternativeStablecoin = alternativeStablecoin;
 
         // set indexes
         storeLastId(id);

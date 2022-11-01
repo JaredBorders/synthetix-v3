@@ -139,6 +139,8 @@ contract VaultModule is IVaultModule {
         // check if they have sufficient c-ratio to mint that amount
         Pool.Data storage pool = Pool.load(poolId);
 
+        require(pool.alternativeStablecoin == address(0), "Cannot mint with alternative stablecoins");
+
         int debt = pool.updateAccountDebt(collateralType, accountId);
 
         (, uint collateralValue) = pool.currentAccountCollateral(collateralType, accountId);
@@ -172,6 +174,8 @@ contract VaultModule is IVaultModule {
         uint amount
     ) external override {
         Pool.Data storage pool = Pool.load(poolId);
+        require(pool.alternativeStablecoin == address(0), "Cannot burn with alternative stablecoins");
+
         int debt = pool.updateAccountDebt(collateralType, accountId);
 
         if (debt < 0) {
